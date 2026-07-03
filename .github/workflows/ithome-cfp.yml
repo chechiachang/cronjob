@@ -1,6 +1,12 @@
 name: ithome-cfp
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ithome-cfp/**'
+      - '.github/workflows/ithome-cfp.yml'
   schedule:
     # Run every Monday at 08:00 UTC
     - cron: "0 8 * * 1"

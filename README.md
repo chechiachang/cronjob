@@ -73,7 +73,12 @@ To save output to a file, set `OUTPUT_FILE`:
 
 #### GitHub Actions
 
-This job is triggered automatically by the [ithome-cfp workflow](./.github/workflows/ithome-cfp.yml).  
+This job is triggered by the [ithome-cfp workflow](./.github/workflows/ithome-cfp.yml) in these cases:
+
+- **Scheduled:** Every Monday at 08:00 UTC
+- **On push:** When PR is merged to `main` with changes in `ithome-cfp/` or the workflow file
+- **Manual:** Anytime via the Actions tab
+
 The `FIRECRAWL_API_KEY` secret must be set in the repository settings.
 
 ## Structure
