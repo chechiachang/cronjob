@@ -70,6 +70,25 @@ def scrape_event_page(api_key: str, event_url: str) -> dict:
         return {}
 
 
+def parse_chinese_date(date_str: str) -> str:
+    """Convert Chinese date format to YYYY-MM-DD.
+
+    Args:
+        date_str: Date string in format "YYYY 年 MM 月 DD 日"
+
+    Returns:
+        Date string in YYYY-MM-DD format or original if parse fails.
+    """
+    try:
+        match = re.search(r"(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日", date_str)
+        if match:
+            year, month, day = match.groups()
+            return f"{year}-{int(month):02d}-{int(day):02d}"
+    except Exception:
+        pass
+    return date_str
+
+
 def extract_event_details(markdown: str) -> dict:
     """Extract event details from event page markdown.
 
@@ -77,18 +96,25 @@ def extract_event_details(markdown: str) -> dict:
         markdown: The markdown content of the event page.
 
     Returns:
-        A dictionary with extracted details: location, dates, cfp_link.
+        A dictionary with extracted details: location, dates, cfp_deadline, event_date, cfp_link.
     """
     details = {}
 
-    date_pattern = re.compile(r"\d{4}[-/]\d{2}[-/]\d{2}")
+    iso_date_pattern = re.compile(r"\d{4}[-/]\d{2}[-/]\d{2}")
+    chinese_date_pattern = re.compile(r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日")
     cfp_link_pattern = re.compile(
         r"https://(docs\.google\.com|forms\.gle|[^/]+\.typeform\.com|airtable\.com|surveyheart\.com)[^\s\)]*"
     )
 
-    dates = date_pattern.findall(markdown)
-    if dates:
-        details["dates"] = list(set(dates))
+    iso_dates = iso_date_pattern.findall(markdown)
+    chinese_dates = chinese_date_pattern.findall(markdown)
+
+    all_dates = []
+    all_dates.extend(iso_dates)
+    all_dates.extend([parse_chinese_date(d) for d in chinese_dates])
+
+    if all_dates:
+        details["dates"] = list(set(all_dates))
 
     cfp_links = cfp_link_pattern.findall(markdown)
     if cfp_links:
@@ -97,13 +123,23 @@ def extract_event_details(markdown: str) -> dict:
             details["cfp_link"] = cfp_match.group(0)
 
     lines = markdown.split("\n")
-    for line in lines:
+    for i, line in enumerate(lines):
         line_lower = line.lower()
-        if "location" in line_lower or "地點" in line_lower or "venue" in line_lower:
+
+        if "投稿截止" in line or "cfp" in line_lower or "call for" in line_lower:
+            deadline = line.strip().replace("**", "").replace("##", "").strip()
+            if deadline and len(deadline) > 5:
+                details["cfp_deadline"] = deadline
+
+        if "活動日期" in line or "event date" in line_lower:
+            event_date = line.strip().replace("**", "").replace("##", "").strip()
+            if event_date and len(event_date) > 5:
+                details["event_date"] = event_date
+
+        if "地點" in line or "location" in line_lower or "venue" in line_lower:
             location = line.strip().replace("**", "").replace("##", "").strip()
             if location and len(location) > 5:
                 details["location"] = location
-                break
 
     return details
 
@@ -214,20 +250,26 @@ def print_summary(output: dict) -> None:
         print(f"\n📌 Event #{i}", file=sys.stderr)
 
         if event.get("title"):
-            print(f"   Title:    {event['title']}", file=sys.stderr)
+            print(f"   Title:      {event['title']}", file=sys.stderr)
 
         if event.get("url"):
-            print(f"   URL:      {event['url']}", file=sys.stderr)
+            print(f"   URL:        {event['url']}", file=sys.stderr)
 
         if event.get("location"):
-            print(f"   Location: {event['location']}", file=sys.stderr)
+            print(f"   Location:   {event['location']}", file=sys.stderr)
+
+        if event.get("cfp_deadline"):
+            print(f"   CFP Close:  {event['cfp_deadline']}", file=sys.stderr)
+
+        if event.get("event_date"):
+            print(f"   Event Date: {event['event_date']}", file=sys.stderr)
 
         if event.get("dates"):
-            dates_str = " ~ ".join(event["dates"])
-            print(f"   Dates:    {dates_str}", file=sys.stderr)
+            dates_str = " | ".join(event["dates"])
+            print(f"   All Dates:  {dates_str}", file=sys.stderr)
 
         if event.get("cfp_link"):
-            print(f"   CFP:      {event['cfp_link']}", file=sys.stderr)
+            print(f"   CFP Link:   {event['cfp_link']}", file=sys.stderr)
 
     print("\n" + "=" * 70, file=sys.stderr)
 
@@ -251,19 +293,27 @@ def write_github_summary(output: dict) -> None:
             f.write(f"### {i}. {event.get('title', 'Untitled')}\n\n")
 
             if event.get("url"):
-                f.write(f"- **Event Page:** [{event['url']}]({event['url']})\n")
+                f.write(f"**Event Page:** [{event['url']}]({event['url']})\n\n")
 
             if event.get("location"):
-                f.write(f"- **Location:** {event['location']}\n")
+                f.write(f"📍 **Location:** {event['location']}\n\n")
+
+            if event.get("cfp_deadline"):
+                f.write(f"📝 **CFP Deadline:** {event['cfp_deadline']}\n\n")
+
+            if event.get("event_date"):
+                f.write(f"📅 **Event Date:** {event['event_date']}\n\n")
 
             if event.get("dates"):
-                dates_str = " ~ ".join(event["dates"])
-                f.write(f"- **Dates:** {dates_str}\n")
+                f.write(f"🗓️ **All Dates:**\n")
+                for date in event["dates"]:
+                    f.write(f"- {date}\n")
+                f.write("\n")
 
             if event.get("cfp_link"):
-                f.write(f"- **CFP Link:** [{event['cfp_link']}]({event['cfp_link']})\n")
+                f.write(f"🔗 **Submit CFP:** [{event['cfp_link']}]({event['cfp_link']})\n\n")
 
-            f.write("\n")
+            f.write("---\n\n")
 
 
 def main() -> None:
