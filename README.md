@@ -28,7 +28,7 @@ This simulates the workflow in a Docker container locally before pushing to GitH
 ### ithome-cfp
 
 Scrapes CFP (Call for Proposals) events from [iThome](https://www.ithome.com.tw/cfp) using [Firecrawl](https://docs.firecrawl.dev/introduction).  
-**Schedule:** Daily at 08:00 UTC
+**Schedule:** Every Monday at 08:00 UTC
 
 #### Requirements
 
