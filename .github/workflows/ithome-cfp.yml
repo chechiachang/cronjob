@@ -38,10 +38,3 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           OUTPUT_FILE: ithome-cfp/events.json
         run: python ithome-cfp/main.py
-
-      - name: Upload events artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ithome-cfp-events
-          path: ithome-cfp/events.json
-          if-no-files-found: warn
