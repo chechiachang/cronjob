@@ -171,6 +171,34 @@ def print_summary(output: dict) -> None:
     print("\n" + "=" * 70, file=sys.stderr)
 
 
+def write_github_summary(output: dict) -> None:
+    """Write event summary to GitHub job summary for visibility on run page."""
+    summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_file:
+        return
+
+    with open(summary_file, "a", encoding="utf-8") as f:
+        f.write("# 📊 iThome CFP Scraping Results\n\n")
+        f.write(f"**Total Events Found:** {output['total']}\n\n")
+
+        if output["total"] == 0:
+            f.write("No events found.\n")
+            return
+
+        f.write("## Events\n\n")
+        for i, event in enumerate(output["events"], 1):
+            f.write(f"### {i}. {event.get('title', 'Untitled')}\n\n")
+
+            if event.get("url"):
+                f.write(f"- **URL:** [{event['url']}]({event['url']})\n")
+
+            if event.get("dates"):
+                dates_str = " ~ ".join(event["dates"])
+                f.write(f"- **Dates:** {dates_str}\n")
+
+            f.write("\n")
+
+
 def main() -> None:
     api_key = os.environ.get("FIRECRAWL_API_KEY")
     if not api_key:
@@ -197,6 +225,7 @@ def main() -> None:
         print(json.dumps(output, ensure_ascii=False, indent=2))
 
     print_summary(output)
+    write_github_summary(output)
 
 
 if __name__ == "__main__":
