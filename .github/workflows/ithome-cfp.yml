@@ -1,0 +1,47 @@
+name: ithome-cfp
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ithome-cfp/**'
+      - '.github/workflows/ithome-cfp.yml'
+  schedule:
+    # Run every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    name: Scrape iThome CFP events
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r ithome-cfp/requirements.txt
+
+      - name: Run scraper
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          OUTPUT_FILE: ithome-cfp/events.json
+        run: python ithome-cfp/main.py
+
+      - name: Upload events artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ithome-cfp-events
+          path: ithome-cfp/events.json
+          if-no-files-found: warn
