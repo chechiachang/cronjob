@@ -43,18 +43,16 @@ def scrape_cfp(api_key: str) -> dict:
 
     result = app.scrape_url(
         CFP_URL,
-        params={
-            "formats": ["markdown", "links"],
-        },
+        formats=["markdown", "links"],
     )
     return result
 
 
-def parse_events(scrape_result: dict) -> list[dict]:
+def parse_events(scrape_result) -> list[dict]:
     """Extract CFP event entries from a Firecrawl scrape result.
 
     Args:
-        scrape_result: Dictionary returned by ``scrape_cfp()``.  Expected keys:
+        scrape_result: Firecrawl Document object or dict with:
           - "markdown" (str): page content as Markdown.
           - "links" (list): link objects with "url"/"href" and optional "text".
 
@@ -68,8 +66,12 @@ def parse_events(scrape_result: dict) -> list[dict]:
     """
     events = []
 
-    markdown = scrape_result.get("markdown", "")
-    links = scrape_result.get("links", [])
+    if isinstance(scrape_result, dict):
+        markdown = scrape_result.get("markdown", "")
+        links = scrape_result.get("links", [])
+    else:
+        markdown = getattr(scrape_result, "markdown", "")
+        links = getattr(scrape_result, "links", [])
 
     # Build a lookup of link text -> href from the links list
     link_map: dict[str, str] = {}
