@@ -3,9 +3,9 @@ ithome-cfp: Scrape CFP (Call for Proposals) events from www.ithome.com.tw/cfp
 using the Firecrawl API and print the results as JSON.
 
 Usage:
-    FIRECRAWL_API_KEY=<key> python main.py
+    python main.py
 
-Environment variables:
+Environment variables (read from ../.env or system env):
     FIRECRAWL_API_KEY  - Required. Your Firecrawl API key.
     OUTPUT_FILE        - Optional. Path to write JSON output (default: stdout).
 """
@@ -14,8 +14,12 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
 
+from dotenv import load_dotenv
 from firecrawl import FirecrawlApp
+
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 CFP_URL = "https://www.ithome.com.tw/cfp"
 
