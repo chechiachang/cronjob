@@ -17,8 +17,8 @@ Test GitHub Actions workflows locally using [act](https://github.com/nektos/act)
 # Install act (macOS)
 brew install act
 
-# Test the ithome-cfp workflow using .env file
-act -j scrape --env-file .env
+# Test the ithome-cfp workflow
+act -j scrape -s FIRECRAWL_API_KEY=$(grep FIRECRAWL_API_KEY .env | cut -d '=' -f2)
 ```
 
 This simulates the workflow in a Docker container locally before pushing to GitHub.
