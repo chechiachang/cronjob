@@ -48,6 +48,29 @@ def scrape_cfp(api_key: str) -> dict:
     return result
 
 
+def is_event_entry(line: str, title: str) -> bool:
+    """Check if a line is likely a real CFP event, not navigation/image/UI text."""
+    if not title or len(title) < 5:
+        return False
+
+    skip_patterns = [
+        "移至",  # skip to
+        "主內容",  # main content
+        "![",  # image markdown
+        "footer",  # footer
+        "sidebar",  # sidebar
+        "menu",  # menu
+        "breadcrumb",  # breadcrumb
+    ]
+
+    title_lower = title.lower()
+    for pattern in skip_patterns:
+        if pattern in title_lower or pattern in line:
+            return False
+
+    return True
+
+
 def parse_events(scrape_result) -> list[dict]:
     """Extract CFP event entries from a Firecrawl scrape result.
 
@@ -101,6 +124,11 @@ def parse_events(scrape_result) -> list[dict]:
         has_date = bool(date_pattern.search(line))
 
         if found_links or has_date:
+            title = found_links[0][0] if found_links else ""
+
+            if not is_event_entry(line, title):
+                continue
+
             entry: dict = {"raw": line}
 
             if found_links:
@@ -117,13 +145,39 @@ def parse_events(scrape_result) -> list[dict]:
     return events
 
 
+def print_summary(output: dict) -> None:
+    print("=" * 70, file=sys.stderr)
+    print(f"✅ Scraping completed: {output['total']} events found", file=sys.stderr)
+    print("=" * 70, file=sys.stderr)
+
+    for i, event in enumerate(output["events"], 1):
+        print(f"\n📌 Event #{i}", file=sys.stderr)
+
+        if event.get("title"):
+            print(f"   Title:  {event['title']}", file=sys.stderr)
+
+        if event.get("url"):
+            print(f"   URL:    {event['url']}", file=sys.stderr)
+
+        if event.get("dates"):
+            dates_str = " ~ ".join(event["dates"])
+            print(f"   Dates:  {dates_str}", file=sys.stderr)
+
+        if event.get("raw") and len(event["raw"]) <= 100:
+            print(f"   Raw:    {event['raw']}", file=sys.stderr)
+        elif event.get("raw"):
+            print(f"   Raw:    {event['raw'][:97]}...", file=sys.stderr)
+
+    print("\n" + "=" * 70, file=sys.stderr)
+
+
 def main() -> None:
     api_key = os.environ.get("FIRECRAWL_API_KEY")
     if not api_key:
         print("Error: FIRECRAWL_API_KEY environment variable is not set.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Scraping {CFP_URL} ...", file=sys.stderr)
+    print(f"🔄 Scraping {CFP_URL} ...", file=sys.stderr)
     scrape_result = scrape_cfp(api_key)
 
     events = parse_events(scrape_result)
@@ -138,9 +192,11 @@ def main() -> None:
     if output_file:
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
-        print(f"Results written to {output_file}", file=sys.stderr)
+        print(f"\n💾 Results written to {output_file}", file=sys.stderr)
     else:
         print(json.dumps(output, ensure_ascii=False, indent=2))
+
+    print_summary(output)
 
 
 if __name__ == "__main__":
