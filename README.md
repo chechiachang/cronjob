@@ -9,6 +9,20 @@ A collection of scheduled jobs triggered by GitHub Actions. Each subdirectory co
    - `FIRECRAWL_API_KEY` — your [Firecrawl](https://www.firecrawl.dev/) API key (used by the `ithome-cfp` job).
 3. The workflows run automatically on schedule, or you can trigger them manually from the **Actions** tab.
 
+## Local Testing
+
+Test GitHub Actions workflows locally using [act](https://github.com/nektos/act):
+
+```bash
+# Install act (macOS)
+brew install act
+
+# Test the ithome-cfp workflow using .env file
+act -j scrape --env-file .env
+```
+
+This simulates the workflow in a Docker container locally before pushing to GitHub.
+
 ## Jobs
 
 ### ithome-cfp
