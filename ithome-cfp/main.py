@@ -48,6 +48,66 @@ def scrape_cfp(api_key: str) -> dict:
     return result
 
 
+def scrape_event_page(api_key: str, event_url: str) -> dict:
+    """Scrape an individual event page to extract details.
+
+    Args:
+        api_key: A valid Firecrawl API key.
+        event_url: The URL of the event page.
+
+    Returns:
+        A dictionary with event details or empty dict if scrape fails.
+    """
+    try:
+        app = FirecrawlApp(api_key=api_key)
+        result = app.scrape_url(
+            event_url,
+            formats=["markdown"],
+        )
+        return result if result else {}
+    except Exception as e:
+        print(f"Warning: Failed to scrape event page {event_url}: {e}", file=sys.stderr)
+        return {}
+
+
+def extract_event_details(markdown: str) -> dict:
+    """Extract event details from event page markdown.
+
+    Args:
+        markdown: The markdown content of the event page.
+
+    Returns:
+        A dictionary with extracted details: location, dates, cfp_link.
+    """
+    details = {}
+
+    date_pattern = re.compile(r"\d{4}[-/]\d{2}[-/]\d{2}")
+    cfp_link_pattern = re.compile(
+        r"https://(docs\.google\.com|forms\.gle|[^/]+\.typeform\.com|airtable\.com|surveyheart\.com)[^\s\)]*"
+    )
+
+    dates = date_pattern.findall(markdown)
+    if dates:
+        details["dates"] = list(set(dates))
+
+    cfp_links = cfp_link_pattern.findall(markdown)
+    if cfp_links:
+        cfp_match = re.search(cfp_link_pattern, markdown)
+        if cfp_match:
+            details["cfp_link"] = cfp_match.group(0)
+
+    lines = markdown.split("\n")
+    for line in lines:
+        line_lower = line.lower()
+        if "location" in line_lower or "地點" in line_lower or "venue" in line_lower:
+            location = line.strip().replace("**", "").replace("##", "").strip()
+            if location and len(location) > 5:
+                details["location"] = location
+                break
+
+    return details
+
+
 def is_event_entry(line: str, title: str) -> bool:
     """Check if a line is likely a real CFP event, not navigation/image/UI text."""
     if not title or len(title) < 5:
@@ -154,19 +214,20 @@ def print_summary(output: dict) -> None:
         print(f"\n📌 Event #{i}", file=sys.stderr)
 
         if event.get("title"):
-            print(f"   Title:  {event['title']}", file=sys.stderr)
+            print(f"   Title:    {event['title']}", file=sys.stderr)
 
         if event.get("url"):
-            print(f"   URL:    {event['url']}", file=sys.stderr)
+            print(f"   URL:      {event['url']}", file=sys.stderr)
+
+        if event.get("location"):
+            print(f"   Location: {event['location']}", file=sys.stderr)
 
         if event.get("dates"):
             dates_str = " ~ ".join(event["dates"])
-            print(f"   Dates:  {dates_str}", file=sys.stderr)
+            print(f"   Dates:    {dates_str}", file=sys.stderr)
 
-        if event.get("raw") and len(event["raw"]) <= 100:
-            print(f"   Raw:    {event['raw']}", file=sys.stderr)
-        elif event.get("raw"):
-            print(f"   Raw:    {event['raw'][:97]}...", file=sys.stderr)
+        if event.get("cfp_link"):
+            print(f"   CFP:      {event['cfp_link']}", file=sys.stderr)
 
     print("\n" + "=" * 70, file=sys.stderr)
 
@@ -190,11 +251,17 @@ def write_github_summary(output: dict) -> None:
             f.write(f"### {i}. {event.get('title', 'Untitled')}\n\n")
 
             if event.get("url"):
-                f.write(f"- **URL:** [{event['url']}]({event['url']})\n")
+                f.write(f"- **Event Page:** [{event['url']}]({event['url']})\n")
+
+            if event.get("location"):
+                f.write(f"- **Location:** {event['location']}\n")
 
             if event.get("dates"):
                 dates_str = " ~ ".join(event["dates"])
                 f.write(f"- **Dates:** {dates_str}\n")
+
+            if event.get("cfp_link"):
+                f.write(f"- **CFP Link:** [{event['cfp_link']}]({event['cfp_link']})\n")
 
             f.write("\n")
 
@@ -209,6 +276,19 @@ def main() -> None:
     scrape_result = scrape_cfp(api_key)
 
     events = parse_events(scrape_result)
+
+    print(f"📖 Scraping {len(events)} event pages for details...", file=sys.stderr)
+    for event in events:
+        if event.get("url"):
+            event_page = scrape_event_page(api_key, event["url"])
+            if event_page:
+                markdown = (
+                    event_page.get("markdown", "")
+                    if isinstance(event_page, dict)
+                    else getattr(event_page, "markdown", "")
+                )
+                details = extract_event_details(markdown)
+                event.update(details)
 
     output = {
         "source": CFP_URL,
